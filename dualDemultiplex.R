@@ -182,7 +182,7 @@ writeDemultiplexedSequences <- function(multiplexedData, readFilePath,
   null <- lapply(1:length(reads), function(i, reads, type, outfolder){
     filePath <- file.path(
       outfolder, paste0(names(reads[i]), ".", type, ".fastq"))
-    writeFastq(reads[[i]], file = filePath)
+    writeFastq(reads[[i]], file = filePath, compress = FALSE)
     message(paste0("\nWrote ", length(reads[[i]]), " reads to:\n", filePath, "."))
   }, reads = reads, type = type, outfolder = outfolder)
   return(list(readFilePath, type, outfolder))
