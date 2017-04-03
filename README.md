@@ -34,11 +34,17 @@ If replicates are included and are to be pooled, sample names should be in the a
 
 ## Arguments
 **help** [-h, --help] Help information regarding input format and arguments available.
+
 **seq file input** [--read1, --read2, --index1, --index2] File paths to the respective FASTQ files.
+
 **output folder** [-o, --outFolder] Output directory for demultiplexed files.
+
 **pool replicates** [-p, --poolreps] Pools replicates. Replicate designation delimited by "-". ie. sample-1, sample-2, ...
+
 **max barcode mismatch** [--maxMismatch] Allowable mismatch in barcode sequences. 
+
 **barcode length** [--barcode1Length, --barcode2Length] Length of barcode sequences for demultiplexing. Default is 8 nt.
+
 **cores** [-c, --cores] Number of maximum cores to parallel the processing during certain steps.
 
 ## Dependencies
