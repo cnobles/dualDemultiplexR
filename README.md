@@ -33,13 +33,13 @@ samples :
 If replicates are included and are to be pooled, sample names should be in the above format (sampleName-#). Pooled replicates with be consolidated if the "-p" or "--poolreps" flag is used with the "-" as the delimiter between sampleNames and replicate designations. Likewise, sampleNames should not include the "-" symbol if pooling replicates is desired.
 
 ## Arguments
-{-h, --help} Help information regarding input format and arguments available.
-{--read1, --read2, --index1, --index2} File paths to the respective FASTQ files.
-{-o, --outFolder} Output directory for demultiplexed files.
-{-p, --poolreps} Pools replicates. Replicate designation delimited by "-". ie. sample-1, sample-2, ...
-{--maxMismatch} Allowable mismatch in barcode sequences. 
-{--barcode1Length, --barcode2Length} Length of barcode sequences for demultiplexing.
-{-c, --cores} Number of maximum cores to parallel the processing during certain steps.
+**help** [-h, --help] Help information regarding input format and arguments available.
+**seq file input** [--read1, --read2, --index1, --index2] File paths to the respective FASTQ files.
+**output folder** [-o, --outFolder] Output directory for demultiplexed files.
+**pool replicates** [-p, --poolreps] Pools replicates. Replicate designation delimited by "-". ie. sample-1, sample-2, ...
+**max barcode mismatch** [--maxMismatch] Allowable mismatch in barcode sequences. 
+**barcode length** [--barcode1Length, --barcode2Length] Length of barcode sequences for demultiplexing. Default is 8 nt.
+**cores** [-c, --cores] Number of maximum cores to parallel the processing during certain steps.
 
 ## Dependencies
 dualDemultiplexR is coded in R, and was developed on v3.2.2, though it should run with earlier versions given the appropriate dependencies. The script uses 6 additional packages:
