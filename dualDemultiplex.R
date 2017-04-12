@@ -8,7 +8,8 @@ code_dir <- dirname(
   sub("--file=", "", grep("--file=", commandArgs(trailingOnly=FALSE), value=T)))
 
 #' Set up and gather command line arguments
-parser <- ArgumentParser(description = "R-based demultiplexing for GuideSeq.")
+parser <- ArgumentParser(
+  description = "R-based demultiplexing for dual-barcoded Illumina sequencing runs.")
 parser$add_argument(
   "-m", "--manifest", type = "character", help = "GuideSeq manifest yaml.")
 parser$add_argument(
@@ -24,7 +25,8 @@ parser$add_argument(
 parser$add_argument(
   "-p", "--poolreps", action = "store_true", help = "Pools replicates.")
 parser$add_argument(
-  "--maxMismatch", nargs = 1, type = "integer", help = "Max mismatch allowed in barcodes.")
+  "--maxMismatch", nargs = 1, type = "integer", 
+  help = "Max mismatch allowed in barcodes. It is recommended to use either ambiguous nucleotide codes or maxMismatch, not both.")
 parser$add_argument(
   "--barcode1Length", nargs = 1, type = "integer", default = 8, 
   help = "Length of barcode1, in nucleotides. Default = 8.")
@@ -32,7 +34,14 @@ parser$add_argument(
   "--barcode2Length", nargs = 1, type = "integer", default = 8,
   help = "Length of barcode2, in nucleotides. Default = 8.")
 parser$add_argument(
-  "-c", "--cores", nargs = 1, type = "integer", help = "Max cores to be used.")
+  "--readNamePattern", nargs = 1, type = "character", 
+  default = "[\\w:-]+",
+  help = "Regular expression for pattern matching read names. Should not contain R1/R2/I1/I2 specific components.")
+parser$add_argument(
+  "--compress", action = "store_true", help = "Output fastq files are gzipped.")
+parser$add_argument(
+  "-c", "--cores", nargs = 1, default = 0, type = "integer", 
+  help = "Max cores to be used. If 0 (default), program will not utilize parallel processing.")
 
 args <- parser$parse_args(commandArgs(trailingOnly = TRUE))
 input_table <- data.frame(
@@ -42,18 +51,45 @@ input_table <- data.frame(
 input_table <- input_table[
   match(c("manifest :", "index1 :", "index2 :", "read1 :", "read2 :", 
           "outfolder :", "poolreps :", "cores :", "maxMismatch :", 
-          "barcode1Length :", "barcode2Length :"),
+          "barcode1Length :", "barcode2Length :", "readNamePattern :"),
         input_table$Variables),]
 pandoc.title("Demultiplex Inputs")
 pandoc.table(data.frame(input_table, row.names = NULL), 
              justify = c("left", "left"), 
              split.tables = Inf)
 
+# Create output directory if not currently available
+if(!file.exists(args$outfolder)){
+  attempt <- try(system(paste0("mkdir ", args$outfolder)))
+  if(attempt == 1) stop("Cannot create output folder.")
+}
+
 # Load additional dependencies
 add_dependencies <- c("stringr", "ShortRead", "Biostrings")
 
 null <- suppressMessages(
   sapply(add_dependencies, library, character.only = TRUE))
+
+nuc4.4 <- matrix(c(
+  5L, -4L, -4L, -4L, -4L, 1L, 1L, -4L, -4L, 1L, -4L, -1L, -1L, -1L, -2L, -4L, 
+  5L, -4L, -4L, -4L, 1L, -4L, 1L, 1L, -4L, -1L, -4L, -1L, -1L, -2L, -4L, -4L, 
+  5L, -4L, 1L, -4L, 1L, -4L, 1L, -4L, -1L, -1L, -4L, -1L, -2L, -4L, -4L, -4L, 
+  5L, 1L, -4L, -4L, 1L, -4L, 1L, -1L, -1L, -1L, -4L, -2L, -4L, -4L, 1L, 1L, 
+  -1L, -4L, -2L, -2L, -2L, -2L, -1L, -1L, -3L, -3L, -1L, 1L, 1L, -4L, -4L, -4L, 
+  -1L, -2L, -2L, -2L, -2L, -3L, -3L, -1L, -1L, -1L, 1L, -4L, 1L, -4L, -2L, -2L, 
+  -1L, -4L, -2L, -2L, -3L, -1L, -3L, -1L, -1L, -4L, 1L, -4L, 1L, -2L, -2L, -4L, 
+  -1L, -2L, -2L, -1L, -3L, -1L, -3L, -1L, -4L, 1L, 1L, -4L, -2L, -2L, -2L, -2L, 
+  -1L, -4L, -1L, -3L, -3L, -1L, -1L, 1L, -4L, -4L, 1L, -2L, -2L, -2L, -2L, -4L, 
+  -1L, -3L, -1L, -1L, -3L, -1L, -4L, -1L, -1L, -1L, -1L, -3L, -3L, -1L, -1L, 
+  -3L, -1L, -2L, -2L, -2L, -1L, -1L, -4L, -1L, -1L, -1L, -3L, -1L, -3L, -3L, 
+  -1L, -2L, -1L, -2L, -2L, -1L, -1L, -1L, -4L, -1L, -3L, -1L, -3L, -1L, -3L, 
+  -1L, -2L, -2L, -1L, -2L, -1L, -1L, -1L, -1L, -4L, -3L, -1L, -1L, -3L, -1L, 
+  -3L, -2L, -2L, -2L, -1L, -1L, -2L, -2L, -2L, -2L, -1L, -1L, -1L, -1L, -1L, 
+  -1L, -1L, -1L, -1L, -1L, -1L), 
+  nrow = 15L, ncol = 15L,
+  dimnames =  list(
+    c("A", "T", "G", "C", "S", "W", "R", "Y", "K", "M", "B","V", "H", "D", "N"), 
+    c("A", "T", "G", "C", "S", "W", "R", "Y", "K", "M", "B", "V", "H", "D", "N")))
 
 rm(null)
 
@@ -68,38 +104,81 @@ samples.df <- data.frame(
 )
 
 # Read in I1 and I2 sequences
-parseIndexReads <- function(barcode, indexFilePath, barcodeLength, maxMismatch){
+parseIndexReads <- function(barcode, indexFilePath, barcodeLength, maxMismatch, 
+                            submat, readNamePattern){
+  # Require packages for parallel processing
   dependencies <- c("stringr", "ShortRead", "Biostrings")
-  null <- sapply(dependencies, library, character.only = TRUE)
+  loaded <- sapply(dependencies, require, character.only = TRUE)
+  stopifnot(all(loaded))
+  # Load index file sequences and sequence names
   index <- readFastq(indexFilePath)
   indexReads <- DNAStringSet(sread(index), start = 1, end = barcodeLength)
   names(indexReads) <- sapply(strsplit(as.character(id(index)), " "), "[[", 1)
-  mindex <- vmatchPattern(
-    barcode, 
-    indexReads, 
-    max.mismatch = maxMismatch)
-  names(unlist(mindex))
+  # Determine max score with barcode, submat, and maxMismatch
+  maxAry <- sapply(1:nrow(submat), function(i) max(submat[i,c("A", "T", "G", "C")]))
+  minAry <- sapply(1:nrow(submat), function(i) min(submat[i,c("A", "T", "G", "C")]))
+  names(maxAry) <- rownames(submat)
+  names(minAry) <- rownames(submat)
+  maxScoreAry <- maxAry[unlist(strsplit(barcode, ""))]
+  minScoreAry <- minAry[unlist(strsplit(barcode, ""))]
+  minScore <- sum(
+    maxScoreAry[order(maxScoreAry, decreasing = TRUE)][
+      1:(length(maxScoreAry)-maxMismatch)])
+  if(maxMismatch > 0){
+    minScore <- minScore + sum(minScoreAry[
+      order(minScoreAry, decreasing = TRUE)][1:maxMismatch])
+  }
+  # Identify read names with sequences above or equal to the minscore
+  scores <- pairwiseAlignment(
+    indexReads, barcode, type = "global", substitutionMatrix = submat, 
+    gapOpening = 15, gapExtension = 5, scoreOnly = TRUE)
+  str_extract(as.character(id(index)), readNamePattern)[scores >= minScore]
 }
 
-cluster <- makeCluster(min(c(detectCores(), args$cores)))
-
-I1.parsed <-  parLapply(
-  cluster,
-  unique(samples.df$barcode1), 
-  parseIndexReads,
-  indexFilePath = args$index1,
-  barcodeLength = args$barcode1Length,
-  maxMismatch = args$maxMismatch)
-
-I2.parsed <- parLapply(
-  cluster, 
-  unique(samples.df$barcode2), 
-  parseIndexReads,
-  indexFilePath = args$index2,
-  barcodeLength = args$barcode2Length,
-  maxMismatch = args$maxMismatch)
-
-stopCluster(cluster)
+if(args$cores > 0){
+  suppressMessages(library(parallel))
+  cluster <- makeCluster(min(c(detectCores(), args$cores)))
+  
+  I1.parsed <-  parLapply(
+    cluster,
+    unique(samples.df$barcode1), 
+    parseIndexReads,
+    indexFilePath = args$index1,
+    barcodeLength = args$barcode1Length,
+    maxMismatch = args$maxMismatch,
+    submat = nuc4.4,
+    readNamePattern = args$readNamePattern)
+  
+  I2.parsed <- parLapply(
+    cluster, 
+    unique(samples.df$barcode2), 
+    parseIndexReads,
+    indexFilePath = args$index2,
+    barcodeLength = args$barcode2Length,
+    maxMismatch = args$maxMismatch,
+    submat = nuc4.4,
+    readNamePattern = args$readNamePattern)
+  
+  stopCluster(cluster)
+}else{
+  I1.parsed <-  lapply(
+    unique(samples.df$barcode1), 
+    parseIndexReads,
+    indexFilePath = args$index1,
+    barcodeLength = args$barcode1Length,
+    maxMismatch = args$maxMismatch,
+    submat = nuc4.4,
+    readNamePattern = args$readNamePattern)
+  
+  I2.parsed <- lapply(
+    unique(samples.df$barcode2), 
+    parseIndexReads,
+    indexFilePath = args$index2,
+    barcodeLength = args$barcode2Length,
+    maxMismatch = args$maxMismatch,
+    submat = nuc4.4,
+    readNamePattern = args$readNamePattern)
+}
 
 names(I1.parsed) <- unique(samples.df$barcode1)
 names(I2.parsed) <- unique(samples.df$barcode2)
@@ -135,7 +214,7 @@ pandoc.table(samples.df, split.tables = Inf)
 message(paste0("Ambiguous reads: ", length(ambiguousReads)))
 # Unassigned reads
 readNames <- id(readFastq(args$index1))
-readNames <- sapply(strsplit(as.character(readNames), " "), "[[", 1)
+readNames <- str_extract(as.character(readNames), args$readNamePattern)
 unassignedReadNames <- readNames[
   !readNames %in% unlist(demultiplexedReadNames)]
 unassignedReadNames <- unassignedReadNames[
@@ -165,37 +244,64 @@ multiplexedData <- rbind(multiplexedData, ambiguousData, unassignedData)
 stopifnot(nrow(multiplexedData) == length(readNames))
 
 if(args$poolreps){
-  multiplexedData$sample <- sapply(
-    strsplit(multiplexedData$sample, "-"), "[[", 1)
+  multiplexedData$sample <- gsub("-\\d+$", "", multiplexedData$sample)
 }
 
-message(paste0("\nReads writen to files: ", nrow(multiplexedData)))
+message(paste0("\nReads to be written to files: ", nrow(multiplexedData)))
 
 # Write files to read files to outfolder directory
-writeDemultiplexedSequences <- function(multiplexedData, readFilePath, 
-                                        type, outfolder){
+writeDemultiplexedSequences <- function(readFilePath, type, multiplexedData, 
+                                        readNamePattern, outfolder, compress){
+  # Require packages for parallel processing
+  dependencies <- c("stringr", "ShortRead", "Biostrings")
+  loaded <- sapply(dependencies, require, character.only = TRUE)
+  stopifnot(all(loaded))
+  # Load read sequences and sequence names then write to file
   reads <- readFastq(readFilePath)
-  ids <- sapply(strsplit(as.character(id(reads)), " "), "[[", 1)
+  ids <- str_extract(as.character(id(reads)), readNamePattern)
   reads <- reads[match(multiplexedData$readName, ids)]
   reads <- split(reads, multiplexedData$sample)
-  
-  null <- lapply(1:length(reads), function(i, reads, type, outfolder){
-    filePath <- file.path(
-      outfolder, paste0(names(reads[i]), ".", type, ".fastq"))
-    writeFastq(reads[[i]], file = filePath, compress = FALSE)
-    message(paste0("\nWrote ", length(reads[[i]]), " reads to:\n", filePath, "."))
-  }, reads = reads, type = type, outfolder = outfolder)
+  null <- lapply(1:length(reads), function(i, reads, type, outfolder, compress){
+    if(compress){  
+      filePath <- file.path(
+        outfolder, paste0(names(reads[i]), ".", type, ".fastq.gz"))
+    }else{
+      filePath <- file.path(
+        outfolder, paste0(names(reads[i]), ".", type, ".fastq"))
+    }
+    writeFastq(reads[[i]], file = filePath, compress = compress)
+    message(
+      paste0("\nWrote ", length(reads[[i]]), " reads to:\n", filePath, "."))
+  }, reads = reads, type = type, outfolder = outfolder, compress = compress)
   return(list(readFilePath, type, outfolder))
 }
 
-demultiplex.I1 <- writeDemultiplexedSequences(
-  multiplexedData, args$index1, "i1", args$outfolder)
-demultiplex.I2 <- writeDemultiplexedSequences(
-  multiplexedData, args$index2, "i2", args$outfolder)
-demultiplex.R1 <- writeDemultiplexedSequences(
-  multiplexedData, args$read1, "r1", args$outfolder)
-demultiplex.R2 <- writeDemultiplexedSequences(
-  multiplexedData, args$read2, "r2", args$outfolder)
+if(args$cores > 0){
+  cluster <- makeCluster(min(c(detectCores(), args$cores)))
+  
+  demultiplex <- clusterMap(
+    cluster,
+    writeDemultiplexedSequences,
+    readFilePath = list(args$index1, args$index2, args$read1, args$read2),
+    type = list("i1", "i2", "r1", "r2"),
+    MoreArgs = list(
+      multiplexedData = multiplexedData,
+      readNamePattern = args$readNamePattern,
+      outfolder = args$outfolder,
+      compress = args$compress))
+  
+  stopCluster(cluster)
+}else{
+  demultiplex <- mapply(
+    writeDemultiplexedSequences,
+    readFilePath = list(args$index1, args$index2, args$read1, args$read2),
+    type = list("i1", "i2", "r1", "r2"),
+    MoreArgs = list(
+      multiplexedData = multiplexedData,
+      readNamePattern = args$readNamePattern,
+      outfolder = args$outfolder,
+      compress = args$compress))
+}
 
 message("\nDemultiplexing complete.")
 q()
