@@ -36,7 +36,7 @@ parser$add_argument(
 parser$add_argument(
   "--readNamePattern", nargs = 1, type = "character", 
   default = "[\\w:-]+",
-  help = "Regular expression for pattern matching read names. Should not contain R1/R2/I1/I2 specific components.")
+  help = "Regular expression for pattern matching read names. Should not contain R1/R2/I1/I2 specific components. Default is [\\w:-]+")
 parser$add_argument(
   "--compress", action = "store_true", help = "Output fastq files are gzipped.")
 parser$add_argument(
