@@ -14,26 +14,34 @@ Rscript path/to/dualDemultiplex.R -m manifest.yml \
 ```
 
 ## Sample manifest format
-Manifests contain the barcode information for each sample, currently in a yaml format. An example is show below:
+Manifests contain the barcode information for each sample. The minimal required information are sampleNames, barcode1 and barcode2. Examples show below:
 ```
 # This is an example sample manifest.
 samples :
     treated_sample-1 :
         barcode1 : TAAGGCGA
         barcode2 : TAGATCGC
-        description : Replicate 1 of treated_sample
     
     treated_sample-2 :
         barcode1 : TAAGGCGA
         barcode2 : CGATCCTA
-        description : Replicate 2 of treated_sample
         
     alt_treated_sample-1 :
         barcode1 : NATCGTCA
         barcode2 : NCTGGTAC
-        description : Replicate 1 of alt_treated_sample
         
-...
+# Alternatively, sample manifests can be input as csv files.
+sampleName,barcode1,barcode2
+treated_sample-1,TAAGGCGA,TAGATCGC
+treated_sample-2,TAAGGCGA,CGATCCTA
+alt_treated_sample-1,NATCGTCA,NCTGGTAC
+
+# or tsv files.
+sampleName	barcode1	barcode2
+treated_sample-1	TAAGGCGA	TAGATCGC
+treated_sample-2	TAAGGCGA	CGATCCTA
+alt_treated_sample-1	NATCGTCA	NCTGGTAC	
+
 ```
 If replicates are included and are to be pooled, sample names should be in the above format (sampleName-#). Pooled replicates with be consolidated if the "-p" or "--poolreps" flag is used with the "-" as the delimiter between sampleNames and replicate designations. Likewise, sampleNames should not include the "-" symbol if pooling replicates is desired.
 
