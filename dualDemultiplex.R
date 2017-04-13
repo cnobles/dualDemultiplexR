@@ -1,7 +1,6 @@
 #!/bin/R
 options(stringsAsFactors = FALSE)
 suppressMessages(library("argparse"))
-suppressMessages(library("yaml"))
 suppressMessages(library("pander"))
 
 code_dir <- dirname(
@@ -11,7 +10,7 @@ code_dir <- dirname(
 parser <- ArgumentParser(
   description = "R-based demultiplexing for dual-barcoded Illumina sequencing runs.")
 parser$add_argument(
-  "-m", "--manifest", type = "character", help = "GuideSeq manifest yaml.")
+  "-m", "--manifest", type = "character", help = "Manifest file (*.yaml, *.yml, *.csv, *.tsv).")
 parser$add_argument(
   "--read1", type = "character", help = "Path to Illumina R1 file (FASTQ).")
 parser$add_argument(
@@ -25,8 +24,8 @@ parser$add_argument(
 parser$add_argument(
   "-p", "--poolreps", action = "store_true", help = "Pools replicates.")
 parser$add_argument(
-  "--maxMismatch", nargs = 1, type = "integer", 
-  help = "Max mismatch allowed in barcodes. It is recommended to use either ambiguous nucleotide codes or maxMismatch, not both.")
+  "--maxMismatch", nargs = 1, type = "integer", default = 0,
+  help = "Max mismatch allowed in barcodes (Default = 0). It is recommended to use either ambiguous nucleotide codes or maxMismatch, not both.")
 parser$add_argument(
   "--barcode1Length", nargs = 1, type = "integer", default = 8, 
   help = "Length of barcode1, in nucleotides. Default = 8.")
@@ -34,8 +33,7 @@ parser$add_argument(
   "--barcode2Length", nargs = 1, type = "integer", default = 8,
   help = "Length of barcode2, in nucleotides. Default = 8.")
 parser$add_argument(
-  "--readNamePattern", nargs = 1, type = "character", 
-  default = "[\\w:-]+",
+  "--readNamePattern", nargs = 1, type = "character", default = "[\\w:-]+",
   help = "Regular expression for pattern matching read names. Should not contain R1/R2/I1/I2 specific components. Default is [\\w:-]+")
 parser$add_argument(
   "--compress", action = "store_true", help = "Output fastq files are gzipped.")
@@ -66,9 +64,9 @@ if(!file.exists(args$outfolder)){
 
 # Load additional dependencies
 add_dependencies <- c("stringr", "ShortRead", "Biostrings")
-
-null <- suppressMessages(
-  sapply(add_dependencies, library, character.only = TRUE))
+addDependsLoaded <- suppressMessages(
+  sapply(add_dependencies, require, character.only = TRUE))
+if(!all(addDependsLoaded)) stop("Check dependancies: 'stringr', 'Biostrings', 'ShortRead'.")
 
 nuc4.4 <- matrix(c(
   5L, -4L, -4L, -4L, -4L, 1L, 1L, -4L, -4L, 1L, -4L, -1L, -1L, -1L, -2L, -4L, 
@@ -94,14 +92,25 @@ nuc4.4 <- matrix(c(
 rm(null)
 
 # Load guideseq manifest file
-manifest <- yaml.load_file(args$manifest)
-samples.df <- data.frame(
-  "sample" = names(manifest$samples),
-  "description" = sapply(manifest$samples, function(x) x$description),
-  "barcode1" = sapply(manifest$samples, function(x) x$barcode1),
-  "barcode2" = sapply(manifest$samples, function(x) x$barcode2),
-  row.names = NULL
-)
+fileExt <- unlist(strsplit(args$manifest, "\\."))
+fileExt <- fileExt[length(fileExt)]
+
+if(fileExt %in% c("yaml", "yml")){
+  suppressMessages(library("yaml"))
+  if(!"package:yaml" %in% search()) stop("Package:yaml not loaded or installed.")
+  manifest <- yaml.load_file(args$manifest)
+  samples.df <- data.frame(
+    "sampleName" = names(manifest$samples),
+    "barcode1" = sapply(manifest$samples, function(x) x$barcode1),
+    "barcode2" = sapply(manifest$samples, function(x) x$barcode2),
+    row.names = NULL)
+}else if(fileExt == "csv"){
+  manifest <- read.csv(args$manifest)
+  samples.df <- manifest[, c("sampleName", "barcode1", "barcode2")]
+}else if(fileExt == "tsv"){
+  manifest <- read.delim(args$manifest)
+  samples.df <- manifest[, c("sampleName", "barcode1", "barcode2")]
+}
 
 # Read in I1 and I2 sequences
 parseIndexReads <- function(barcode, indexFilePath, barcodeLength, maxMismatch, 
@@ -208,7 +217,7 @@ demultiplexedReadNames <- lapply(demultiplexedReadNames, function(x, reads){
 
 # Reads by sample
 samples.df$read_counts <- sapply(demultiplexedReadNames, length)
-pandoc.title("Read counts for each sample")
+pandoc.title("Read counts for each sample.")
 pandoc.table(samples.df, split.tables = Inf)
 # Ambiguous reads
 message(paste0("Ambiguous reads: ", length(ambiguousReads)))
@@ -223,19 +232,19 @@ message(paste0("\nUnassigned reads: ", length(unassignedReadNames)))
 
 # Create multiplex dataframe for subseting sequencing files
 multiplexedData <- data.frame(
-  "sample" = Rle(
-    values = samples.df$sample, 
+  "sampleName" = Rle(
+    values = samples.df$sampleName, 
     length = sapply(demultiplexedReadNames, length)),
   "readName" = unlist(demultiplexedReadNames),
   row.names = NULL)
 
 ambiguousData <- data.frame(
-  "sample" = rep("ambiguous", length(ambiguousReads)),
+  "sampleName" = rep("ambiguous", length(ambiguousReads)),
   "readName" = ambiguousReads,
   row.names = NULL)
 
 unassignedData <- data.frame(
-  "sample" = rep("unassigned", length(unassignedReadNames)),
+  "sampleName" = rep("unassigned", length(unassignedReadNames)),
   "readName" = unassignedReadNames,
   row.names = NULL)
 
@@ -244,7 +253,7 @@ multiplexedData <- rbind(multiplexedData, ambiguousData, unassignedData)
 stopifnot(nrow(multiplexedData) == length(readNames))
 
 if(args$poolreps){
-  multiplexedData$sample <- gsub("-\\d+$", "", multiplexedData$sample)
+  multiplexedData$sampleName <- gsub("-\\d+$", "", multiplexedData$sampleName)
 }
 
 message(paste0("\nReads to be written to files: ", nrow(multiplexedData)))
@@ -260,7 +269,7 @@ writeDemultiplexedSequences <- function(readFilePath, type, multiplexedData,
   reads <- readFastq(readFilePath)
   ids <- str_extract(as.character(id(reads)), readNamePattern)
   reads <- reads[match(multiplexedData$readName, ids)]
-  reads <- split(reads, multiplexedData$sample)
+  reads <- split(reads, multiplexedData$sampleName)
   null <- lapply(1:length(reads), function(i, reads, type, outfolder, compress){
     if(compress){  
       filePath <- file.path(
