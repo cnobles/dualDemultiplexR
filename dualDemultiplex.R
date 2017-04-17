@@ -67,28 +67,10 @@ add_dependencies <- c("stringr", "ShortRead", "Biostrings")
 addDependsLoaded <- suppressMessages(
   sapply(add_dependencies, require, character.only = TRUE))
 if(!all(addDependsLoaded)) stop("Check dependancies: 'stringr', 'Biostrings', 'ShortRead'.")
+source(file.path(
+  code_dir, "supporting_scripts/binary_ambiguous_nucleotide_scoring_matrix.R"))
 
-nuc4.4 <- matrix(c(
-  5L, -4L, -4L, -4L, -4L, 1L, 1L, -4L, -4L, 1L, -4L, -1L, -1L, -1L, -2L, -4L, 
-  5L, -4L, -4L, -4L, 1L, -4L, 1L, 1L, -4L, -1L, -4L, -1L, -1L, -2L, -4L, -4L, 
-  5L, -4L, 1L, -4L, 1L, -4L, 1L, -4L, -1L, -1L, -4L, -1L, -2L, -4L, -4L, -4L, 
-  5L, 1L, -4L, -4L, 1L, -4L, 1L, -1L, -1L, -1L, -4L, -2L, -4L, -4L, 1L, 1L, 
-  -1L, -4L, -2L, -2L, -2L, -2L, -1L, -1L, -3L, -3L, -1L, 1L, 1L, -4L, -4L, -4L, 
-  -1L, -2L, -2L, -2L, -2L, -3L, -3L, -1L, -1L, -1L, 1L, -4L, 1L, -4L, -2L, -2L, 
-  -1L, -4L, -2L, -2L, -3L, -1L, -3L, -1L, -1L, -4L, 1L, -4L, 1L, -2L, -2L, -4L, 
-  -1L, -2L, -2L, -1L, -3L, -1L, -3L, -1L, -4L, 1L, 1L, -4L, -2L, -2L, -2L, -2L, 
-  -1L, -4L, -1L, -3L, -3L, -1L, -1L, 1L, -4L, -4L, 1L, -2L, -2L, -2L, -2L, -4L, 
-  -1L, -3L, -1L, -1L, -3L, -1L, -4L, -1L, -1L, -1L, -1L, -3L, -3L, -1L, -1L, 
-  -3L, -1L, -2L, -2L, -2L, -1L, -1L, -4L, -1L, -1L, -1L, -3L, -1L, -3L, -3L, 
-  -1L, -2L, -1L, -2L, -2L, -1L, -1L, -1L, -4L, -1L, -3L, -1L, -3L, -1L, -3L, 
-  -1L, -2L, -2L, -1L, -2L, -1L, -1L, -1L, -1L, -4L, -3L, -1L, -1L, -3L, -1L, 
-  -3L, -2L, -2L, -2L, -1L, -1L, -2L, -2L, -2L, -2L, -1L, -1L, -1L, -1L, -1L, 
-  -1L, -1L, -1L, -1L, -1L, -1L), 
-  nrow = 15L, ncol = 15L,
-  dimnames =  list(
-    c("A", "T", "G", "C", "S", "W", "R", "Y", "K", "M", "B","V", "H", "D", "N"), 
-    c("A", "T", "G", "C", "S", "W", "R", "Y", "K", "M", "B", "V", "H", "D", "N")))
-
+submat <- banmat()
 rm(null)
 
 # Load guideseq manifest file
@@ -119,29 +101,18 @@ parseIndexReads <- function(barcode, indexFilePath, barcodeLength, maxMismatch,
   dependencies <- c("stringr", "ShortRead", "Biostrings")
   loaded <- sapply(dependencies, require, character.only = TRUE)
   stopifnot(all(loaded))
+
   # Load index file sequences and sequence names
   index <- readFastq(indexFilePath)
   indexReads <- DNAStringSet(sread(index), start = 1, end = barcodeLength)
   names(indexReads) <- sapply(strsplit(as.character(id(index)), " "), "[[", 1)
-  # Determine max score with barcode, submat, and maxMismatch
-  maxAry <- sapply(1:nrow(submat), function(i) max(submat[i,c("A", "T", "G", "C")]))
-  minAry <- sapply(1:nrow(submat), function(i) min(submat[i,c("A", "T", "G", "C")]))
-  names(maxAry) <- rownames(submat)
-  names(minAry) <- rownames(submat)
-  maxScoreAry <- maxAry[unlist(strsplit(barcode, ""))]
-  minScoreAry <- minAry[unlist(strsplit(barcode, ""))]
-  minScore <- sum(
-    maxScoreAry[order(maxScoreAry, decreasing = TRUE)][
-      1:(length(maxScoreAry)-maxMismatch)])
-  if(maxMismatch > 0){
-    minScore <- minScore + sum(minScoreAry[
-      order(minScoreAry, decreasing = TRUE)][1:maxMismatch])
-  }
+
   # Identify read names with sequences above or equal to the minscore
   scores <- pairwiseAlignment(
     indexReads, barcode, type = "global", substitutionMatrix = submat, 
-    gapOpening = 15, gapExtension = 5, scoreOnly = TRUE)
-  str_extract(as.character(id(index)), readNamePattern)[scores >= minScore]
+    gapOpening = 3, gapExtension = 1, scoreOnly = TRUE)
+  str_extract(as.character(id(index)), readNamePattern)[
+    scores >= (barcodeLength - maxMismatch)]
 }
 
 if(args$cores > 0){
@@ -155,7 +126,7 @@ if(args$cores > 0){
     indexFilePath = args$index1,
     barcodeLength = args$barcode1Length,
     maxMismatch = args$maxMismatch,
-    submat = nuc4.4,
+    submat = submat,
     readNamePattern = args$readNamePattern)
   
   I2.parsed <- parLapply(
@@ -165,7 +136,7 @@ if(args$cores > 0){
     indexFilePath = args$index2,
     barcodeLength = args$barcode2Length,
     maxMismatch = args$maxMismatch,
-    submat = nuc4.4,
+    submat = submat,
     readNamePattern = args$readNamePattern)
   
   stopCluster(cluster)
@@ -176,7 +147,7 @@ if(args$cores > 0){
     indexFilePath = args$index1,
     barcodeLength = args$barcode1Length,
     maxMismatch = args$maxMismatch,
-    submat = nuc4.4,
+    submat = submat,
     readNamePattern = args$readNamePattern)
   
   I2.parsed <- lapply(
@@ -185,7 +156,7 @@ if(args$cores > 0){
     indexFilePath = args$index2,
     barcodeLength = args$barcode2Length,
     maxMismatch = args$maxMismatch,
-    submat = nuc4.4,
+    submat = submat,
     readNamePattern = args$readNamePattern)
 }
 
