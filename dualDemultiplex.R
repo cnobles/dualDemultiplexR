@@ -71,7 +71,6 @@ source(file.path(
   code_dir, "supporting_scripts/binary_ambiguous_nucleotide_scoring_matrix.R"))
 
 submat <- banmat()
-rm(null)
 
 # Load guideseq manifest file
 fileExt <- unlist(strsplit(args$manifest, "\\."))
