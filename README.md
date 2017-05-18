@@ -11,6 +11,7 @@ Rscript path/to/dualDemultiplex.R -m manifest.yml \
   --read1 READ1.fastq --read2 READ2.fastq --index1 INDEX1.fastq --index2 INDEX2.fastq \
   --outFolder ~/demultiplexed --poolreps --maxMismatch 1 --barcode1Length 8 --barcode2Length 8 \
   --readNamePattern [\\w:-]+ --compress --cores 4
+  
 ```
 
 ## Sample manifest format
@@ -55,6 +56,8 @@ Barcode sequences can contain ambiguous nucleotides. It is recommended that the 
 **[-o, --outFolder]** Output directory for demultiplexed files.
 
 **[-p, --poolreps]** Pools replicates. Replicate designation delimited by "-". ie. sample-1, sample-2, ...
+
+**[--singleBarcode]** Demultiplexes by only a single barcode, either 'index1' or 'index2'. Default [FALSE].
 
 **[--maxMismatch]** Allowable mismatch in barcode sequences. 
 

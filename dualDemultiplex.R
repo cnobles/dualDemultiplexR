@@ -24,6 +24,9 @@ parser$add_argument(
 parser$add_argument(
   "-p", "--poolreps", action = "store_true", help = "Pools replicates.")
 parser$add_argument(
+  "--singleBarcode", nargs = 1, type = "character", 
+  help = "Demultiplex with only a single barcode. Manifest should contain empty data for unused barcode. (Default = FALSE, options include 'index1' and 'index2'.)")
+parser$add_argument(
   "--maxMismatch", nargs = 1, type = "integer", default = 0,
   help = "Max mismatch allowed in barcodes (Default = 0). It is recommended to use either ambiguous nucleotide codes or maxMismatch, not both.")
 parser$add_argument(
@@ -42,13 +45,18 @@ parser$add_argument(
   help = "Max cores to be used. If 0 (default), program will not utilize parallel processing.")
 
 args <- parser$parse_args(commandArgs(trailingOnly = TRUE))
+
+if(!args$singleBarcode %in% c(FALSE, "index1", "index2")){
+  stop("Please choose either 'index1' or 'index2' for single demultiplexing.")
+}
+
 input_table <- data.frame(
   "Variables" = paste0(names(args), " :"), 
   "Values" = sapply(1:length(args), function(i){
     paste(args[[i]], collapse = ", ")}))
 input_table <- input_table[
   match(c("manifest :", "index1 :", "index2 :", "read1 :", "read2 :", 
-          "outfolder :", "poolreps :", "cores :", "maxMismatch :", 
+          "outfolder :", "poolreps :", "singleBarcode :", "cores :", "maxMismatch :", 
           "barcode1Length :", "barcode2Length :", "readNamePattern :"),
         input_table$Variables),]
 pandoc.title("Demultiplex Inputs")
@@ -93,6 +101,22 @@ if(fileExt %in% c("yaml", "yml")){
   samples.df <- manifest[, c("sampleName", "barcode1", "barcode2")]
 }
 
+if(args$singleBarcode == FALSE){
+  uniqueSamples <- nrow(samples.df[,c("barcode1", "barcode2")]) == 
+    nrow(unique(samples.df[,c("barcode1", "barcode2")]))
+  if(!uniqueSamples) stop("Samples do not have unique barcodes. Please correct.")
+}else{
+  if(args$singleBarcode == "index1"){
+    uniqueSamples <- length(samples.df[,c("barcode1")]) == 
+      length(unique(samples.df[,"barcode1"]))
+    if(!uniqueSamples) stop("Samples do not have unique barcodes. Please correct.")
+  }else{
+    uniqueSamples <- length(samples.df[,c("barcode2")]) == 
+      length(unique(samples.df[,"barcode2"]))
+    if(!uniqueSamples) stop("Samples do not have unique barcodes. Please correct.")
+  }
+}
+
 # Read in I1 and I2 sequences
 parseIndexReads <- function(barcode, indexFilePath, barcodeLength, maxMismatch, 
                             submat, readNamePattern){
@@ -118,63 +142,83 @@ if(args$cores > 0){
   suppressMessages(library(parallel))
   cluster <- makeCluster(min(c(detectCores(), args$cores)))
   
-  I1.parsed <-  parLapply(
-    cluster,
-    unique(samples.df$barcode1), 
-    parseIndexReads,
-    indexFilePath = args$index1,
-    barcodeLength = args$barcode1Length,
-    maxMismatch = args$maxMismatch,
-    submat = submat,
-    readNamePattern = args$readNamePattern)
+  if(args$singleBarcode == FALSE | args$singleBarcode == "index1"){
+    I1.parsed <-  parLapply(
+      cluster,
+      unique(samples.df$barcode1), 
+      parseIndexReads,
+      indexFilePath = args$index1,
+      barcodeLength = args$barcode1Length,
+      maxMismatch = args$maxMismatch,
+      submat = submat,
+      readNamePattern = args$readNamePattern)
+  }
   
-  I2.parsed <- parLapply(
-    cluster, 
-    unique(samples.df$barcode2), 
-    parseIndexReads,
-    indexFilePath = args$index2,
-    barcodeLength = args$barcode2Length,
-    maxMismatch = args$maxMismatch,
-    submat = submat,
-    readNamePattern = args$readNamePattern)
+  if(args$singleBarcode == FALSE | args$singleBarcode == "index2"){
+    I2.parsed <- parLapply(
+      cluster, 
+      unique(samples.df$barcode2), 
+      parseIndexReads,
+      indexFilePath = args$index2,
+      barcodeLength = args$barcode2Length,
+      maxMismatch = args$maxMismatch,
+      submat = submat,
+      readNamePattern = args$readNamePattern)
+  }
   
   stopCluster(cluster)
 }else{
-  I1.parsed <-  lapply(
-    unique(samples.df$barcode1), 
-    parseIndexReads,
-    indexFilePath = args$index1,
-    barcodeLength = args$barcode1Length,
-    maxMismatch = args$maxMismatch,
-    submat = submat,
-    readNamePattern = args$readNamePattern)
+  if(args$singleBarcode == FALSE | args$singleBarcode == "index1"){
+    I1.parsed <-  lapply(
+      unique(samples.df$barcode1), 
+      parseIndexReads,
+      indexFilePath = args$index1,
+      barcodeLength = args$barcode1Length,
+      maxMismatch = args$maxMismatch,
+      submat = submat,
+      readNamePattern = args$readNamePattern)
+  }
   
-  I2.parsed <- lapply(
-    unique(samples.df$barcode2), 
-    parseIndexReads,
-    indexFilePath = args$index2,
-    barcodeLength = args$barcode2Length,
-    maxMismatch = args$maxMismatch,
-    submat = submat,
-    readNamePattern = args$readNamePattern)
+  if(args$singleBarcode == FALSE | args$singleBarcode == "index2"){
+    I2.parsed <- lapply(
+      unique(samples.df$barcode2), 
+      parseIndexReads,
+      indexFilePath = args$index2,
+      barcodeLength = args$barcode2Length,
+      maxMismatch = args$maxMismatch,
+      submat = submat,
+      readNamePattern = args$readNamePattern)
+  }
 }
 
-names(I1.parsed) <- unique(samples.df$barcode1)
-names(I2.parsed) <- unique(samples.df$barcode2)
+if(args$singleBarcode == FALSE | args$singleBarcode == "index1"){
+  names(I1.parsed) <- unique(samples.df$barcode1)
+  pandoc.title("Barcode1 breakdown:")
+  pandoc.table(sapply(I1.parsed, length), split.tables = Inf)
+}
 
-pandoc.title("Barcode1 breakdown:")
-pandoc.table(sapply(I1.parsed, length), split.tables = Inf)
-pandoc.title("Barcode2 breakdown:")
-pandoc.table(sapply(I2.parsed, length), split.tables = Inf)
+if(args$singleBarcode == FALSE | args$singleBarcode == "index2"){
+  names(I2.parsed) <- unique(samples.df$barcode2)
+  pandoc.title("Barcode2 breakdown:")
+  pandoc.table(sapply(I2.parsed, length), split.tables = Inf)
+}
 
-demultiplexedReadNames <- mapply(
-  function(barcode1, barcode2){
-    intersect(I1.parsed[[barcode1]], I2.parsed[[barcode2]])
-  },
-  barcode1 = samples.df$barcode1,
-  barcode2 = samples.df$barcode2)
-names(demultiplexedReadNames) <- paste0(
-  samples.df$barcode1, samples.df$barcode2)
+if(args$singleBarcode == FALSE){
+  demultiplexedReadNames <- mapply(
+    function(barcode1, barcode2){
+      intersect(I1.parsed[[barcode1]], I2.parsed[[barcode2]])
+    },
+    barcode1 = samples.df$barcode1,
+    barcode2 = samples.df$barcode2)
+  names(demultiplexedReadNames) <- paste0(
+    samples.df$barcode1, samples.df$barcode2)
+}else{
+  if(args$singleBarcode == "index1"){
+    demultiplexedReadNames <- I1.parsed
+  }else{
+    demultiplexedReadNames <- I2.parsed
+  }
+}
 
 # As there is some flexibility in the barcode matching, some reads may be 
 # be assigned to multiple samples. These reads are ambiguous and will be 
@@ -192,7 +236,7 @@ pandoc.table(samples.df, split.tables = Inf)
 # Ambiguous reads
 message(paste0("Ambiguous reads: ", length(ambiguousReads)))
 # Unassigned reads
-readNames <- id(readFastq(args$index1))
+readNames <- id(readFastq(args$read1))
 readNames <- str_extract(as.character(readNames), args$readNamePattern)
 unassignedReadNames <- readNames[
   !readNames %in% unlist(demultiplexedReadNames)]
@@ -258,11 +302,27 @@ writeDemultiplexedSequences <- function(readFilePath, type, multiplexedData,
 if(args$cores > 0){
   cluster <- makeCluster(min(c(detectCores(), args$cores)))
   
+  if(args$singleBarcode == FALSE){
+    readList <- list("i1", "i2", "r1", "r2")
+  }else if(args$singleBarcode == "index1"){
+    readList <- list("i1", "r1", "r2")
+  }else{
+    readList <- list("i2", "r1", "r2")
+  }
+  
+  if(args$singleBarcode == FALSE){
+    readPaths <- list(args$index1, args$index2, args$read1, args$read2)
+  }else if(args$singleBarcode == "index1"){
+    readPaths <- list(args$index1, args$read1, args$read2)
+  }else{
+    readPaths<- list(args$index2, args$read1, args$read2)
+  }
+  
   demultiplex <- clusterMap(
     cluster,
     writeDemultiplexedSequences,
-    readFilePath = list(args$index1, args$index2, args$read1, args$read2),
-    type = list("i1", "i2", "r1", "r2"),
+    readFilePath = readPaths,
+    type = readList,
     MoreArgs = list(
       multiplexedData = multiplexedData,
       readNamePattern = args$readNamePattern,
@@ -271,10 +331,26 @@ if(args$cores > 0){
   
   stopCluster(cluster)
 }else{
+  if(args$singleBarcode == FALSE){
+    readList <- list("i1", "i2", "r1", "r2")
+  }else if(args$singleBarcode == "index1"){
+    readList <- list("i1", "r1", "r2")
+  }else{
+    readList <- list("i2", "r1", "r2")
+  }
+  
+  if(args$singleBarcode == FALSE){
+    readPaths <- list(args$index1, args$index2, args$read1, args$read2)
+  }else if(args$singleBarcode == "index1"){
+    readPaths <- list(args$index1, args$read1, args$read2)
+  }else{
+    readPaths<- list(args$index2, args$read1, args$read2)
+  }
+  
   demultiplex <- mapply(
     writeDemultiplexedSequences,
-    readFilePath = list(args$index1, args$index2, args$read1, args$read2),
-    type = list("i1", "i2", "r1", "r2"),
+    readFilePath = readPaths,
+    type = readList,
     MoreArgs = list(
       multiplexedData = multiplexedData,
       readNamePattern = args$readNamePattern,
