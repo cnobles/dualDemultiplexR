@@ -80,7 +80,7 @@ source(file.path(
 
 submat <- banmat()
 
-# Load guideseq manifest file
+# Load manifest / sample mapping file
 fileExt <- unlist(strsplit(args$manifest, "\\."))
 fileExt <- fileExt[length(fileExt)]
 
