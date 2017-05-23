@@ -1,4 +1,4 @@
-#!/bin/R
+#!/usr/bin/env Rscript
 options(stringsAsFactors = FALSE)
 suppressMessages(library("argparse"))
 suppressMessages(library("pander"))
