@@ -24,7 +24,7 @@ parser$add_argument(
 parser$add_argument(
   "-p", "--poolreps", action = "store_true", help = "Pools replicates.")
 parser$add_argument(
-  "--singleBarcode", nargs = 1, type = "character", 
+  "--singleBarcode", nargs = 1, type = "character", default = FALSE,
   help = "Demultiplex with only a single barcode. Manifest should contain empty data for unused barcode. (Default = FALSE, options include 'index1' and 'index2'.)")
 parser$add_argument(
   "--maxMismatch", nargs = 1, type = "integer", default = 0,
