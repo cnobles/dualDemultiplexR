@@ -14,7 +14,7 @@ Rscript path/to/dualDemultiplex.R -m manifest.yml \
   
 ```
 
-## Sample manifest format
+## Sample info / manifest / mapping file format
 Manifests contain the barcode information for each sample. The minimal required information are sampleNames, barcode1 and barcode2. Examples show below:
 ```
 # This is an example sample manifest.
