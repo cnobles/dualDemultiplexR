@@ -57,11 +57,15 @@ Barcode sequences can contain ambiguous nucleotides. It is recommended that the 
 
 **[-p, --poolreps]** Pools replicates. Replicate designation delimited by "-". ie. sample-1, sample-2, ...
 
-**[--singleBarcode]** Demultiplexes by only a single barcode, either 'index1' or 'index2'. Default [FALSE].
+**[--singleBarcode]** Demultiplexes by only a single barcode, specify with **[--barcode1]**.
 
-**[--maxMismatch]** Allowable mismatch in barcode sequences. 
+**[--barcode1, --barcode2]** Read type containing respecive barcode sequences, defaults are I1 and I2. Options are R1, R2, I1, or I2.
 
 **[--barcode1Length, --barcode2Length]** Length of barcode sequences for demultiplexing. Default is 8 nt.
+
+**[--maxMismatch]** Allowable mismatch in barcode sequences. Overrides **[--bc1Mismatch, --bc2Mismatch]**. 
+
+**[--bc1Mismatch, --bc2Mismatch]** Allowable mismatch in specific barcode alignments.
 
 **[--readNamePattern]** Regex pattern to capture read names without read-type specific info.
 
