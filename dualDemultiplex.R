@@ -350,7 +350,7 @@ writeDemultiplexedSequences <- function(readFilePath, type, multiplexedData,
 if(args$cores > 0){
   cluster <- makeCluster(min(c(detectCores(), args$cores)))
   
-  readList <- demulti$readType[demulti$readType != "NA"]
+  readList <- demulti$readType[demulti$path != "NA"]
   readPaths <- demulti$path[match(readList, demulti$readType)]
 
   demultiplex <- clusterMap(
@@ -366,7 +366,7 @@ if(args$cores > 0){
   
   stopCluster(cluster)
 }else{
-  readList <- demulti$readType[demulti$readType != "NA"]
+  readList <- demulti$readType[demulti$path != "NA"]
   readPaths <- demulti$path[match(readList, demulti$readType)]
   
   demultiplex <- mapply(
