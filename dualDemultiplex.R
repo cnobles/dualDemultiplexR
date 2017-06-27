@@ -206,6 +206,10 @@ if(args$cores > 0){
     submat = submat,
     readNamePattern = args$readNamePattern)
   
+  names(BC1_parsed) <- unique(samples_df$barcode1)
+  pandoc.title("Barcode1 breakdown:")
+  pandoc.table(sapply(BC1_parsed, length))
+  
   if(!args$singleBarcode){
     BC2_parsed <- parLapply(
       cluster, 
@@ -228,7 +232,11 @@ if(args$cores > 0){
     maxMismatch = args$bc1Mismatch,
     submat = submat,
     readNamePattern = args$readNamePattern)
-  
+
+  names(BC1_parsed) <- unique(samples_df$barcode1)
+  pandoc.title("Barcode1 breakdown:")
+  pandoc.table(sapply(BC1_parsed, length))
+    
   if(!args$singleBarcode){
     BC2_parsed <- lapply(
       unique(samples_df$barcode2), 
@@ -241,14 +249,10 @@ if(args$cores > 0){
   }
 }
 
-names(BC1_parsed) <- unique(samples_df$barcode1)
-pandoc.title("Barcode1 breakdown:")
-pandoc.table(sapply(BC1_parsed, length), split.tables = Inf)
-
 if(!args$singleBarcode){
   names(BC2_parsed) <- unique(samples_df$barcode2)
   pandoc.title("Barcode2 breakdown:")
-  pandoc.table(sapply(BC2_parsed, length), split.tables = Inf)
+  pandoc.table(sapply(BC2_parsed, length))
 }
 
 if(!args$singleBarcode){
