@@ -47,7 +47,7 @@ parser$add_argument(
   "--barcode2Length", nargs = 1, type = "integer", default = 8,
   help = "Length of barcode2, in nucleotides. Default = 8.")
 parser$add_argument(
-  "--maxMismatch", nargs = 1, type = "integer", default = "NA",
+  "--maxMismatch", nargs = 1, type = "integer", 
   help = "Max mismatch allowed in barcodes (Default = 0). It is recommended to use either ambiguous nucleotide codes or designate mismatch allowance, not both.")
 parser$add_argument(
   "--bc1Mismatch", nargs = 1, type = "integer", default = 0,
@@ -85,7 +85,7 @@ if(args$singleBarcode){
   demulti$barcode2 <- FALSE
 }
 
-if(args$maxMisMatch != "NA"){
+if(!is.null(args$maxMisMatch)){
   args$bc1Mismatch <- args$maxMismatch
   args$bc2Mismatch <- args$maxMismatch
 }
