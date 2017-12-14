@@ -261,7 +261,8 @@ if(!args$singleBarcode){
       intersect(BC1_parsed[[barcode1]], BC2_parsed[[barcode2]])
     },
     barcode1 = samples_df$barcode1,
-    barcode2 = samples_df$barcode2)
+    barcode2 = samples_df$barcode2,
+    SIMPLIFY = FALSE)
   names(demultiplexedReadNames) <- paste0(
     samples_df$barcode1, samples_df$barcode2)
 }else{
