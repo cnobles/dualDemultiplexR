@@ -9,8 +9,8 @@
 options(stringsAsFactors = FALSE)
 suppressMessages(library("argparse"))
 suppressMessages(library("pander"))
-panderOptions(table.style, "simple")
-panderOptions(table.split.table, Inf)
+panderOptions("table.style", "simple")
+panderOptions("table.split.table", Inf)
 
 code_dir <- dirname(
   sub("--file=", "", grep("--file=", commandArgs(trailingOnly = FALSE), value = TRUE)))
@@ -212,8 +212,8 @@ if(args$cores > 0){
   pandoc.title("Barcode1 breakdown:")
   pandoc.table(data.frame(
       "Barcode1" = names(BC1_parsed),
-      "Read Counts" = sapply(BC1_parsed, length)),
-    row.names = FALSE)
+      "Read Counts" = sapply(BC1_parsed, length),
+      row.names = NULL))
   
   if(!args$singleBarcode){
     BC2_parsed <- parLapply(
@@ -242,8 +242,8 @@ if(args$cores > 0){
   pandoc.title("Barcode1 breakdown:")
   pandoc.table(data.frame(
     "Barcode1" = names(BC1_parsed),
-    "Read Counts" = sapply(BC1_parsed, length)),
-    row.names = FALSE)
+    "Read Counts" = sapply(BC1_parsed, length),
+    row.names = NULL))
   
   if(!args$singleBarcode){
     BC2_parsed <- lapply(
@@ -262,8 +262,8 @@ if(!args$singleBarcode){
   pandoc.title("Barcode2 breakdown:")
   pandoc.table(data.frame(
     "Barcode2" = names(BC2_parsed),
-    "Read Counts" = sapply(BC2_parsed, length)),
-    row.names = FALSE)
+    "Read Counts" = sapply(BC2_parsed, length),
+    row.names = NULL))
 }
 
 if(!args$singleBarcode){
