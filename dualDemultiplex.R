@@ -9,6 +9,8 @@
 options(stringsAsFactors = FALSE)
 suppressMessages(library("argparse"))
 suppressMessages(library("pander"))
+panderOptions(table.style, "simple")
+panderOptions(table.split.table, Inf)
 
 code_dir <- dirname(
   sub("--file=", "", grep("--file=", commandArgs(trailingOnly = FALSE), value = TRUE)))
@@ -208,7 +210,10 @@ if(args$cores > 0){
   
   names(BC1_parsed) <- unique(samples_df$barcode1)
   pandoc.title("Barcode1 breakdown:")
-  pandoc.table(sapply(BC1_parsed, length))
+  pandoc.table(data.frame(
+      "Barcode1" = names(BC1_parsed),
+      "Read Counts" = sapply(BC1_parsed, length)),
+    row.names = FALSE)
   
   if(!args$singleBarcode){
     BC2_parsed <- parLapply(
@@ -235,8 +240,11 @@ if(args$cores > 0){
 
   names(BC1_parsed) <- unique(samples_df$barcode1)
   pandoc.title("Barcode1 breakdown:")
-  pandoc.table(sapply(BC1_parsed, length))
-    
+  pandoc.table(data.frame(
+    "Barcode1" = names(BC1_parsed),
+    "Read Counts" = sapply(BC1_parsed, length)),
+    row.names = FALSE)
+  
   if(!args$singleBarcode){
     BC2_parsed <- lapply(
       unique(samples_df$barcode2), 
@@ -252,7 +260,10 @@ if(args$cores > 0){
 if(!args$singleBarcode){
   names(BC2_parsed) <- unique(samples_df$barcode2)
   pandoc.title("Barcode2 breakdown:")
-  pandoc.table(sapply(BC2_parsed, length))
+  pandoc.table(data.frame(
+    "Barcode2" = names(BC2_parsed),
+    "Read Counts" = sapply(BC2_parsed, length)),
+    row.names = FALSE)
 }
 
 if(!args$singleBarcode){
@@ -341,6 +352,7 @@ writeDemultiplexedSequences <- function(readFilePath, type, multiplexedData,
       filePath <- file.path(
         outfolder, paste0(names(reads[i]), ".", type, ".fastq"))
     }
+    if(file.exists(filePath)) unlink(filePath)
     writeFastq(reads[[i]], file = filePath, compress = compress)
     message(
       paste0("\nWrote ", length(reads[[i]]), " reads to:\n", filePath, "."))
