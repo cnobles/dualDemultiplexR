@@ -194,7 +194,7 @@ parseIndexReads <- function(barcode, indexFilePath, barcodeLength, maxMismatch,
     barcode, indexReads, max.mismatch = maxMismatch, fixed = FALSE)))
 }
 
-if(args$cores > 0){
+if(args$cores > 1){
   suppressMessages(library(parallel))
   cluster <- makeCluster(min(c(detectCores(), args$cores)))
   
@@ -360,7 +360,7 @@ writeDemultiplexedSequences <- function(readFilePath, type, multiplexedData,
   return(list(readFilePath, type, outfolder))
 }
 
-if(args$cores > 0){
+if(args$cores > 1){
   cluster <- makeCluster(min(c(detectCores(), args$cores)))
   
   readList <- demulti$readType[demulti$path != "NA"]
