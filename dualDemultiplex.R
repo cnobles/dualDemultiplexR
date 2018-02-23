@@ -323,6 +323,9 @@ unassignedData <- data.frame(
   row.names = NULL)
 
 multiplexedData <- rbind(multiplexedData, ambiguousData, unassignedData)
+multiplexedData$sampleName <- factor(
+  multiplexedData$sampleName,
+  levels = c(samples_df$sampleName, "ambiguous", "unassigned"))
 
 stopifnot(nrow(multiplexedData) == length(readNames))
 
