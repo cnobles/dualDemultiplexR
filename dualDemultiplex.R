@@ -125,11 +125,6 @@ if(!all(add_packs_loaded)){
   stop("Check dependancies.")
 }
 
-source(file.path(
-  code_dir, "supporting_scripts/binary_ambiguous_nucleotide_scoring_matrix.R"))
-
-submat <- banmat()
-
 # Load manifest / sample mapping file ------------------------------------------
 fileExt <- unlist(strsplit(args$manifest, "\\."))
 fileExt <- fileExt[length(fileExt)]
@@ -175,7 +170,7 @@ if(!args$singleBarcode){
 
 # Read in barcode sequences ----------------------------------------------------
 parseIndexReads <- function(barcode, indexFilePath, barcodeLength, maxMismatch, 
-                            submat, readNamePattern){
+                            readNamePattern){
   # Require packages for parallel processing
   dependencies <- c("stringr", "ShortRead", "Biostrings")
   loaded <- sapply(dependencies, require, character.only = TRUE)
@@ -205,7 +200,6 @@ if(args$cores > 1){
     indexFilePath = demulti$path[demulti$barcode1],
     barcodeLength = args$barcode1Length,
     maxMismatch = args$bc1Mismatch,
-    submat = submat,
     readNamePattern = args$readNamePattern)
   
   names(BC1_parsed) <- unique(samples_df$barcode1)
@@ -223,7 +217,6 @@ if(args$cores > 1){
       indexFilePath = demulti$path[demulti$barcode2],
       barcodeLength = args$barcode2Length,
       maxMismatch = args$bc2Mismatch,
-      submat = submat,
       readNamePattern = args$readNamePattern)
   }
   
@@ -235,7 +228,6 @@ if(args$cores > 1){
     indexFilePath = demulti$path[demulti$barcode1],
     barcodeLength = args$barcode1Length,
     maxMismatch = args$bc1Mismatch,
-    submat = submat,
     readNamePattern = args$readNamePattern)
 
   names(BC1_parsed) <- unique(samples_df$barcode1)
@@ -252,7 +244,6 @@ if(args$cores > 1){
       indexFilePath = demulti$path[demulti$barcode2],
       barcodeLength = args$barcode2Length,
       maxMismatch = args$bc2Mismatch,
-      submat = submat,
       readNamePattern = args$readNamePattern)
   }
 }
