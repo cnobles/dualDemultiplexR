@@ -6,7 +6,7 @@
 #' within a data.frame).
 #' Names with ".": arguments / options for functions
 # Set Global options and load intiial packages ---------------------------------
-options(stringsAsFactors = FALSE)
+options(stringsAsFactors = FALSE, scipen = 99)
 suppressMessages(library("argparse"))
 suppressMessages(library("pander"))
 panderOptions("table.style", "simple")
@@ -63,8 +63,8 @@ parser$add_argument(
 parser$add_argument(
   "--compress", action = "store_true", help = "Output fastq files are gzipped.")
 parser$add_argument(
-  "-c", "--cores", nargs = 1, default = 0, type = "integer", 
-  help = "Max cores to be used. If 0 (default), program will not utilize parallel processing.")
+  "-c", "--cores", nargs = 1, default = 1, type = "integer", 
+  help = "Max cores to be used. If 0 or 1 (default), program will not utilize parallel processing.")
 
 args <- parser$parse_args(commandArgs(trailingOnly = TRUE))
 
@@ -178,16 +178,20 @@ parseIndexReads <- function(barcode, indexFilePath, barcodeLength, maxMismatch,
 
   # Load index file sequences and sequence names
   index <- readFastq(indexFilePath)
-  indexReads <- DNAStringSet(sread(index), start = 1, end = barcodeLength)
-  names(indexReads) <- str_extract(as.character(id(index)), readNamePattern)
+  index <- ShortRead::narrow(index, start = 1, end = barcodeLength)
+  index@id <- BStringSet(str_extract(as.character(id(index)), readNamePattern))
   
   # Trim barcode if necessary
   barcode <- as.character(DNAStringSet(barcode, start = 1, end = barcodeLength))
 
   # Identify read names with sequences above or equal to the minscore
-  names(unlist(vmatchPattern(
-    barcode, indexReads, max.mismatch = maxMismatch, fixed = FALSE)))
+  vmp <- vmatchPattern(
+    barcode, sread(index), max.mismatch = maxMismatch, fixed = FALSE)
+  which(lengths(vmp) == 1)
 }
+
+barcode1_reads <- readFastq(demulti$path[demulti$barcode1])
+message(paste("Reads to demultiplex : ", length(barcode1_reads)))
 
 if(args$cores > 1){
   suppressMessages(library(parallel))
@@ -258,59 +262,58 @@ if(!args$singleBarcode){
 }
 
 if(!args$singleBarcode){
-  demultiplexedReadNames <- mapply(
+  demultiplexedIndices <- mapply(
     function(barcode1, barcode2){
       intersect(BC1_parsed[[barcode1]], BC2_parsed[[barcode2]])
     },
     barcode1 = samples_df$barcode1,
     barcode2 = samples_df$barcode2,
     SIMPLIFY = FALSE)
-  names(demultiplexedReadNames) <- paste0(
+  names(demultiplexedIndices) <- paste0(
     samples_df$barcode1, samples_df$barcode2)
 }else{
-  demultiplexedReadNames <- BC1_parsed
+  demultiplexedIndices <- BC1_parsed
 }
 
 # As there is some flexibility in the barcode matching, some reads may be 
 # be assigned to multiple samples. These reads are ambiguous and will be 
 # removed.
-ambiguousReads <- unique(
-  unlist(demultiplexedReadNames)[duplicated(unlist(demultiplexedReadNames))])
-demultiplexedReadNames <- lapply(demultiplexedReadNames, function(x, reads){
+ambiguousIndices <- unique(
+  unlist(demultiplexedIndices)[duplicated(unlist(demultiplexedIndices))])
+demultiplexedIndices <- lapply(demultiplexedIndices, function(x, reads){
   x[!x %in% reads]},
-  reads = ambiguousReads)
+  reads = ambiguousIndices)
 
 # Reads by sample
-samples_df$read_counts <- sapply(demultiplexedReadNames, length)
+samples_df$read_counts <- sapply(demultiplexedIndices, length)
 pandoc.title("Read counts for each sample.")
 pandoc.table(samples_df, split.tables = Inf)
 # Ambiguous reads
-message(paste0("Ambiguous reads: ", length(ambiguousReads)))
+message(paste0("Ambiguous reads: ", length(ambiguousIndices)))
 # Unassigned reads
-readNames <- id(readFastq(args$read1))
-readNames <- str_extract(as.character(readNames), args$readNamePattern)
-unassignedReadNames <- readNames[
-  !readNames %in% unlist(demultiplexedReadNames)]
-unassignedReadNames <- unassignedReadNames[
-  !unassignedReadNames %in% ambiguousReads]
-message(paste0("\nUnassigned reads: ", length(unassignedReadNames)))
+allIndices <- 1:length(barcode1_reads)
+unassignedIndices <- allIndices[
+  !allIndices %in% unlist(demultiplexedIndices, use.names = FALSE)]
+unassignedIndices <- unassignedIndices[
+  !unassignedIndices %in% ambiguousIndices]
+message(paste0("\nUnassigned reads: ", length(unassignedIndices)))
 
 # Create multiplex dataframe for subseting sequencing files --------------------
 multiplexedData <- data.frame(
   "sampleName" = Rle(
     values = samples_df$sampleName, 
-    length = sapply(demultiplexedReadNames, length)),
-  "readName" = unlist(demultiplexedReadNames),
+    length = sapply(demultiplexedIndices, length)),
+  "index" = unlist(demultiplexedIndices),
   row.names = NULL)
 
 ambiguousData <- data.frame(
-  "sampleName" = rep("ambiguous", length(ambiguousReads)),
-  "readName" = ambiguousReads,
+  "sampleName" = rep("ambiguous", length(ambiguousIndices)),
+  "index" = ambiguousIndices,
   row.names = NULL)
 
 unassignedData <- data.frame(
-  "sampleName" = rep("unassigned", length(unassignedReadNames)),
-  "readName" = unassignedReadNames,
+  "sampleName" = rep("unassigned", length(unassignedIndices)),
+  "index" = unassignedIndices,
   row.names = NULL)
 
 multiplexedData <- rbind(multiplexedData, ambiguousData, unassignedData)
@@ -318,7 +321,7 @@ multiplexedData$sampleName <- factor(
   multiplexedData$sampleName,
   levels = c(samples_df$sampleName, "ambiguous", "unassigned"))
 
-stopifnot(nrow(multiplexedData) == length(readNames))
+stopifnot(nrow(multiplexedData) == length(allIndices))
 
 if(args$poolreps){
   multiplexedData$sampleName <- gsub("-\\d+$", "", multiplexedData$sampleName)
@@ -335,8 +338,8 @@ writeDemultiplexedSequences <- function(readFilePath, type, multiplexedData,
   stopifnot(all(loaded))
   # Load read sequences and sequence names then write to file
   reads <- readFastq(readFilePath)
-  ids <- str_extract(as.character(id(reads)), readNamePattern)
-  reads <- reads[match(multiplexedData$readName, ids)]
+  reads@id <- BStringSet(str_extract(as.character(id(reads)), readNamePattern))
+  reads <- reads[multiplexedData$index]
   reads <- split(reads, multiplexedData$sampleName)
   null <- lapply(1:length(reads), function(i, reads, type, outfolder, compress){
     if(compress){  
