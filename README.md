@@ -1,5 +1,7 @@
 # dualDemultiplexR
-Demultiplex Illumina FASTQ files using dual barcodes (I1 and I2).
+[![Build Status](https://travis-ci.org/cnobles/dualDemultiplexR.svg?branch=master)](https://travis-ci.org/cnobles/dualDemultiplexR)
+
+A tool for demultiplexing reads (paired-end by design, but not required). Indexing can be bases on a wide variety of designs, both single and double barcoding, on any read given (R1, R2, I1, I2). Bins ambiguous and unassigned reads in additional files.
 
 Usage:
 ```
