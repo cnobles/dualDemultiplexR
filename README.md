@@ -69,6 +69,8 @@ Barcode sequences can contain ambiguous nucleotides. It is recommended that the 
 
 **[--bc1Mismatch, --bc2Mismatch]** Allowable mismatch in specific barcode alignments.
 
+**[--stat]** File name to be written in output directory of read couts for each sample. CSV file format. ie. test.stat.csv.
+
 **[--readNamePattern]** Regex pattern to capture read names without read-type specific info.
 
 **[--compress]** Output fastq files are gzipped.
