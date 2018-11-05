@@ -12,59 +12,59 @@ suppressMessages(library("pander"))
 panderOptions("table.style", "simple")
 panderOptions("table.split.table", Inf)
 
-code_dir <- dirname(
-  sub("--file=", "", grep("--file=", commandArgs(trailingOnly = FALSE), value = TRUE)))
+code_dir <- dirname(sub("--file=", "", grep(
+  "--file=", commandArgs(trailingOnly = FALSE), value = TRUE)))
+
+desc <- yaml::yaml.load_file(file.path(code_dir, "descriptions.yml"))
 
 # Set up and gather command line arguments -------------------------------------
 ## Argument parser =============================================================
-parser <- ArgumentParser(
-  description = "R-based demultiplexing for dual-barcoded Illumina sequencing runs.")
+parser <- ArgumentParser(description = desc$program_short_description)
 parser$add_argument(
-  "-m", "--manifest", type = "character", help = "Manifest file (*.yaml, *.yml, *.csv, *.tsv).")
+  "-m", "--manifest", type = "character", help = desc$manifest)
 parser$add_argument(
-  "--read1", type = "character", default = "NA", help = "Path to Illumina R1 file (FASTQ).")
+  "--read1", type = "character", default = "NA", help = desc$read1)
 parser$add_argument(
-  "--read2", type = "character", default = "NA", help = "Path to Illumina R2 file (FASTQ).")
+  "--read2", type = "character", default = "NA", help = desc$read2)
 parser$add_argument(
-  "--index1", type = "character", default = "NA", help = "Path to Illumina I1 file (FASTQ).")
+  "--index1", type = "character", default = "NA", help = desc$index1)
 parser$add_argument(
-  "--index2", type = "character", default = "NA", help = "Path to Illumina I2 file (FASTQ).")
+  "--index2", type = "character", default = "NA", help = desc$index2)
 parser$add_argument(
-  "-o", "--outfolder", nargs = 1, type = "character", help = "Output folder.")
+  "-o", "--outfolder", nargs = 1, type = "character", help = desc$outfolder)
 parser$add_argument(
-  "-p", "--poolreps", action = "store_true", help = "Pools replicates.")
+  "-p", "--poolreps", action = "store_true", help = desc$poolreps)
 parser$add_argument(
-  "--singleBarcode", action = "store_true",
-  help = "Demultiplex with only a single barcode.")
+  "--singleBarcode", action = "store_true", help = desc$singleBarcode)
 parser$add_argument(
-  "--barcode1", nargs = 1, type = "character", default = "I1", 
-  help = "Read type containing barcode 1 sequences. (Default = 'I1', options include 'R1', 'R2', 'I1', and 'I2')")
+  "--barcode1", nargs = 1, type = "character", 
+  default = "I1", help = desc$barcode1)
 parser$add_argument(
-  "--barcode2", nargs = 1, type = "character", default = "I2", 
-  help = "Read type containing barcode 2 sequences. (Default is 'I2', same options as --barcode1)")
+  "--barcode2", nargs = 1, type = "character", 
+  default = "I2", help = desc$barcode2)
 parser$add_argument(
   "--barcode1Length", nargs = 1, type = "integer", default = 8, 
-  help = "Length of barcode1, in nucleotides. Default = 8.")
+  help = desc$barcode1Length)
 parser$add_argument(
   "--barcode2Length", nargs = 1, type = "integer", default = 8,
-  help = "Length of barcode2, in nucleotides. Default = 8.")
+  help = desc$barcode2Length)
 parser$add_argument(
-  "--maxMismatch", nargs = 1, type = "integer", 
-  help = "Max mismatch allowed in barcodes (Default = 0). It is recommended to use either ambiguous nucleotide codes or designate mismatch allowance, not both.")
+  "--maxMismatch", nargs = 1, type = "integer", help = desc$maxMismatch)
 parser$add_argument(
-  "--bc1Mismatch", nargs = 1, type = "integer", default = 0,
-  help = "Max mismatch allowed for barcode1 (Default = 0).")
+  "--bc1Mismatch", nargs = 1, type = "integer", default = 0, 
+  help = desc$bc1Mismatch)
 parser$add_argument(
   "--bc2Mismatch", nargs = 1, type = "integer", default = 0,
-  help = "Max mismatch allowed for barcode2 (Default = 0).")
+  help = desc$bc2Mismatch)
 parser$add_argument(
-  "--readNamePattern", nargs = 1, type = "character", default = "[\\w\\:\\-\\+]+",
-  help = "Regular expression for pattern matching read names. Should not contain R1/R2/I1/I2 specific components. Default is [\\w:-]+")
+  "--stat", nargs = 1, type = "character", default = FALSE, help = desc$stat)
 parser$add_argument(
-  "--compress", action = "store_true", help = "Output fastq files are gzipped.")
+  "--readNamePattern", nargs = 1, type = "character", 
+  default = "[\\w\\:\\-\\+]+", help = desc$readNamePattern)
 parser$add_argument(
-  "-c", "--cores", nargs = 1, default = 1, type = "integer", 
-  help = "Max cores to be used. If 0 or 1 (default), program will not utilize parallel processing.")
+  "--compress", action = "store_true", help = desc$compress)
+parser$add_argument(
+  "-c", "--cores", nargs = 1, default = 1, type = "integer", help = desc$cores)
 
 args <- parser$parse_args(commandArgs(trailingOnly = TRUE))
 
@@ -98,7 +98,7 @@ input_table <- data.frame(
     paste(args[[i]], collapse = ", ")}))
 input_table <- input_table[
   match(c("manifest :", "index1 :", "index2 :", "read1 :", "read2 :", 
-          "outfolder :", "poolreps :", "singleBarcode :", "cores :", 
+          "outfolder :", "stat :", "poolreps :", "singleBarcode :", "cores :", 
           "barcode1 :", "barcode2 :", "barcode1Length :", "barcode2Length :", 
           "bc1Mismatch :", "bc2Mismatch :", "readNamePattern :"),
         input_table$Variables),]
@@ -297,6 +297,21 @@ unassignedIndices <- allIndices[
 unassignedIndices <- unassignedIndices[
   !unassignedIndices %in% ambiguousIndices]
 message(paste0("\nUnassigned reads: ", length(unassignedIndices)))
+
+if(args$stat != FALSE){
+  write.table(
+    data.frame(
+      sampleName = paste0(
+        c(samples_df$sampleName, "ambiguous_reads", "unassigned_reads"), 
+        ".demulti"),
+      metric = "reads",
+      count = c(
+        samples_df$read_counts, 
+        length(ambiguousIndices), 
+        length(unassignedIndices))),
+    file = file.path(args$outfolder, args$stat),
+    sep = ",", row.names = FALSE, col.names = FALSE, quote = FALSE)
+}
 
 # Create multiplex dataframe for subseting sequencing files --------------------
 multiplexedData <- data.frame(

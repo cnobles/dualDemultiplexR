@@ -7,7 +7,7 @@ Rscript dualDemultiplex.R -m tests/sampleInfo.tsv \
   --read2 tests/Data/Undetermined_S0_L001_R2_001.fastq.gz \
   --index1 tests/Data/Undetermined_S0_L001_I1_001.fastq.gz \
   --index2 tests/Data/Undetermined_S0_L001_I2_001.fastq.gz \
-  -o tests/test_output --compress
+  -o tests/test_output --stat test.stat.csv --compress
 
 # Check output for correct findings, 50 testSeq-1, 50 testSeq-2, and 0 testSeq-3
 test_1_len=$(zcat tests/test_output/testSeq-1.R2.fastq.gz | sed -n '2~4p' | wc -l)
