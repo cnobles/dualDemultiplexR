@@ -18,6 +18,8 @@ if [ ! $test_1_len = 50 ] | [ ! $test_2_len = 50 ] | [ ! $test_3_len = 0 ]; then
     exit 1
 fi
 
+# Show stat output.
+cat tests/test_output/test.stat.csv
 
 # Cleanup test directory
 rm -r tests/test_output
